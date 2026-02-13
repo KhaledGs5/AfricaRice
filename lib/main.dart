@@ -1,7 +1,9 @@
 import 'package:africa_rice/widgets/signup.dart';
+import 'package:africa_rice/widgets/singin.dart';
 import 'package:flutter/material.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 
@@ -30,7 +32,7 @@ class WelcomeScreen extends StatelessWidget {
   // 1. Asset image: 'assets/images/background.jpg'
   // 2. Network image: 'https://example.com/image.jpg'
   // 3. Or set to null for solid color background
-  static const String? backgroundImagePath = null;
+  static const String? backgroundImagePath = "assets/background.png";
   
   @override
   Widget build(BuildContext context) {
@@ -42,21 +44,12 @@ class WelcomeScreen extends StatelessWidget {
                   image: backgroundImagePath!.startsWith('http')
                       ? NetworkImage(backgroundImagePath!) as ImageProvider
                       : AssetImage(backgroundImagePath!),
-                  fit: BoxFit.cover,
+                  repeat: ImageRepeat.repeat,
+                  scale: 8.0, 
                   colorFilter: ColorFilter.mode(
-                    Colors.black.withOpacity(0.3),
+                    Colors.black.withOpacity(0.2),
                     BlendMode.darken,
                   ),
-                )
-              : null,
-          gradient: backgroundImagePath == null
-              ? LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.green.shade700,
-                    Colors.green.shade900,
-                  ],
                 )
               : null,
         ),
@@ -68,10 +61,24 @@ class WelcomeScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // Logo or Icon
-                  const Icon(
-                    Icons.grass,
-                    size: 100,
-                    color: Colors.white,
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 20,
+                          spreadRadius: 5,
+                        ),
+                      ],
+                    ),
+                    child: Image.asset(
+                      'assets/icon.png',
+                      width: 80,
+                      height: 80,
+                    ),
                   ),
                   const SizedBox(height: 24),
                   // Title
@@ -90,7 +97,7 @@ class WelcomeScreen extends StatelessWidget {
                     'Welcome to Africa Rice',
                     style: TextStyle(
                       fontSize: 18,
-                      color: Colors.white70,
+                      color: Colors.white,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -101,10 +108,10 @@ class WelcomeScreen extends StatelessWidget {
                     height: 56,
                     child: ElevatedButton(
                       onPressed: () {
-                        // TODO: Navigate to Sign In page
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Sign In page coming soon'),
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SignIn(),
                           ),
                         );
                       },

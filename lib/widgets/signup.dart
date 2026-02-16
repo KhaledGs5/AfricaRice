@@ -1,5 +1,7 @@
 import 'package:africa_rice/data/database/app_database.dart';
+import 'package:africa_rice/data/services/user_session.dart';
 import 'package:africa_rice/widgets/singin.dart';
+import 'package:africa_rice/widgets/home_page.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 
@@ -13,10 +15,15 @@ class SignUp extends StatefulWidget {
 class _SignUpState extends State<SignUp> {
   final _formKey = GlobalKey<FormState>();
   final _userNameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final _roleController = TextEditingController();
   final _organisationController = TextEditingController();
   late final AppDatabase _database;
   bool _isSaving = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   @override
   void initState() {
@@ -27,6 +34,9 @@ class _SignUpState extends State<SignUp> {
   @override
   void dispose() {
     _userNameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _roleController.dispose();
     _organisationController.dispose();
     _database.close();
@@ -43,13 +53,17 @@ class _SignUpState extends State<SignUp> {
     });
 
     final username = _userNameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
     final role = _roleController.text.trim();
     final organisation = _organisationController.text.trim();
 
     try {
-      await _database.insertUser(
+      final userId = await _database.insertUser(
         UsersCompanion(
           username: Value(username),
+          email: Value(email),
+          password: Value(password),
           role: Value(role),
           organisation: organisation.isEmpty
               ? const Value.absent()
@@ -57,26 +71,30 @@ class _SignUpState extends State<SignUp> {
         ),
       );
 
-      if (!mounted) return;
-
-      _userNameController.clear();
-      _roleController.clear();
-      _organisationController.clear();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User saved locally.')),
+      // Save user session
+      await UserSession.saveUserSession(
+        userId: userId,
+        username: username,
+        email: email,
+        role: role,
+        organisation: organisation.isEmpty ? null : organisation,
       );
 
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => const SignIn(),
-        ),
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Account created successfully')));
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomePage()),
+        (route) => false,
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save user: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to save user: $error')));
     } finally {
       if (mounted) {
         setState(() {
@@ -89,10 +107,7 @@ class _SignUpState extends State<SignUp> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sign Up'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Sign Up'), centerTitle: true),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -104,19 +119,13 @@ class _SignUpState extends State<SignUp> {
                 const SizedBox(height: 40),
                 const Text(
                   'Create Account',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 const Text(
                   'Please fill in the form to continue',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                  ),
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 40),
@@ -137,6 +146,102 @@ class _SignUpState extends State<SignUp> {
                     }
                     if (value.length < 3) {
                       return 'Username must be at least 3 characters';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+                // Email Field
+                TextFormField(
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                    labelText: 'Email',
+                    hintText: 'Enter your email',
+                    prefixIcon: const Icon(Icons.email),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your email';
+                    }
+                    final emailRegex = RegExp(
+                      r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                    );
+                    if (!emailRegex.hasMatch(value)) {
+                      return 'Please enter a valid email';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+                // Password Field
+                TextFormField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    hintText: 'Enter your password',
+                    prefixIcon: const Icon(Icons.lock),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your password';
+                    }
+                    if (value.length < 6) {
+                      return 'Password must be at least 6 characters';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+                // Confirm Password Field
+                TextFormField(
+                  controller: _confirmPasswordController,
+                  obscureText: _obscureConfirmPassword,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm Password',
+                    hintText: 'Re-enter your password',
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureConfirmPassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscureConfirmPassword = !_obscureConfirmPassword;
+                        });
+                      },
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please confirm your password';
+                    }
+                    if (value != _passwordController.text) {
+                      return 'Passwords do not match';
                     }
                     return null;
                   },
@@ -199,10 +304,7 @@ class _SignUpState extends State<SignUp> {
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text(
-                          'Sign Up',
-                          style: TextStyle(fontSize: 18),
-                        ),
+                      : const Text('Sign Up', style: TextStyle(fontSize: 18)),
                 ),
                 const SizedBox(height: 20),
                 // Already have an account
@@ -213,9 +315,7 @@ class _SignUpState extends State<SignUp> {
                     TextButton(
                       onPressed: () {
                         Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(
-                            builder: (_) => const SignIn(),
-                          ),
+                          MaterialPageRoute(builder: (_) => const SignIn()),
                         );
                       },
                       child: const Text('Login'),

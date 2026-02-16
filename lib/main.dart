@@ -1,3 +1,5 @@
+import 'package:africa_rice/data/services/user_session.dart';
+import 'package:africa_rice/widgets/home_page.dart';
 import 'package:africa_rice/widgets/signup.dart';
 import 'package:africa_rice/widgets/singin.dart';
 import 'package:flutter/material.dart';
@@ -19,7 +21,33 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
         useMaterial3: true,
       ),
-      home: const WelcomeScreen(),
+      home: const AuthChecker(),
+    );
+  }
+}
+
+class AuthChecker extends StatelessWidget {
+  const AuthChecker({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: UserSession.isLoggedIn(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+        
+        if (snapshot.data == true) {
+          return const HomePage();
+        }
+        
+        return const WelcomeScreen();
+      },
     );
   }
 }

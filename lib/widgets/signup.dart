@@ -2,6 +2,7 @@ import 'package:africa_rice/data/database/app_database.dart';
 import 'package:africa_rice/data/services/user_session.dart';
 import 'package:africa_rice/widgets/singin.dart';
 import 'package:africa_rice/widgets/home_page.dart';
+import 'package:africa_rice/widgets/disclaimer_dialog.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 
@@ -45,6 +46,18 @@ class _SignUpState extends State<SignUp> {
 
   Future<void> _handleSignUp() async {
     if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    // Show disclaimer first
+    if (!mounted) return;
+    final accepted = await showDisclaimerDialog(context, canDismiss: true);
+    
+    if (!accepted) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must accept the disclaimer to continue')),
+      );
       return;
     }
 

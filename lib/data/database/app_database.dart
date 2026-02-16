@@ -16,12 +16,68 @@ class Users extends Table {
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }
 
-@DriftDatabase(tables: [Users])
+class Scans extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get userId => integer().references(Users, #id)();
+  TextColumn get imagePath => text()();
+  DateTimeColumn get scanDate => dateTime().withDefault(currentDateAndTime)();
+  
+  // GPS coordinates (optional)
+  RealColumn get latitude => real().nullable()();
+  RealColumn get longitude => real().nullable()();
+  
+  // Grain count and structure
+  IntColumn get totalGrains => integer()();
+  IntColumn get brokenGrains => integer()();
+  IntColumn get longGrains => integer()();
+  IntColumn get mediumGrains => integer()();
+  IntColumn get shortGrains => integer()();
+  
+  // Grain color composition (counts)
+  IntColumn get blackGrains => integer()();
+  IntColumn get chalkyGrains => integer()();
+  IntColumn get redGrains => integer()();
+  IntColumn get yellowGrains => integer()();
+  IntColumn get greenGrains => integer()();
+  
+  // Kernel shape (averages)
+  RealColumn get avgLength => real()();
+  RealColumn get avgWidth => real()();
+  RealColumn get avgLWR => real()();
+  
+  // CIELAB color values
+  RealColumn get cielabL => real()();
+  RealColumn get cielabA => real()();
+  RealColumn get cielabB => real()();
+  
+  // Computed percentages and classifications
+  RealColumn get brokenPercent => real()();
+  RealColumn get blackPercent => real()();
+  RealColumn get chalkyPercent => real()();
+  RealColumn get redPercent => real()();
+  RealColumn get yellowPercent => real()();
+  RealColumn get greenPercent => real()();
+  RealColumn get longPercent => real()();
+  RealColumn get mediumPercent => real()();
+  RealColumn get shortPercent => real()();
+  
+  // Classifications
+  TextColumn get millingGrade => text()(); // Premium, Grade 1, Grade 2, Grade 3
+  TextColumn get grainShape => text()(); // Bold, Medium, Slender
+  TextColumn get grainLength => text()(); // Long grain, Medium grain, Short grain, Mixed
+  TextColumn get chalkinessStatus => text()(); // Not chalky, Chalky
+  TextColumn get qualityIssues => text().nullable()(); // Damaged, Immature, Red strips, Fermented
+  
+  // Model version for traceability
+  TextColumn get modelVersion => text()();
+}
+
+@DriftDatabase(tables: [Users, Scans])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -33,6 +89,16 @@ class AppDatabase extends _$AppDatabase {
             // Recreate the users table with the new schema
             await m.deleteTable('users');
             await m.createTable(users);
+          }
+          if (from == 2 && to == 3) {
+            // Add scans table
+            await m.createTable(scans);
+          }
+          if (from == 1 && to == 3) {
+            // Recreate the users table and add scans table
+            await m.deleteTable('users');
+            await m.createTable(users);
+            await m.createTable(scans);
           }
         },
       );
@@ -59,6 +125,53 @@ class AppDatabase extends _$AppDatabase {
 
   Future<int> deleteUser(int userId) {
     return (delete(users)..where((tbl) => tbl.id.equals(userId))).go();
+  }
+
+  // Scans operations
+  Future<int> insertScan(ScansCompanion scan) {
+    return into(scans).insert(scan);
+  }
+
+  Future<List<Scan>> getAllScans(int userId) {
+    return (select(scans)
+          ..where((tbl) => tbl.userId.equals(userId))
+          ..orderBy([(tbl) => OrderingTerm.desc(tbl.scanDate)])
+          ..limit(100))
+        .get();
+  }
+
+  Future<Scan?> getScanById(int scanId) {
+    return (select(scans)..where((tbl) => tbl.id.equals(scanId))).getSingleOrNull();
+  }
+
+  Stream<List<Scan>> watchUserScans(int userId) {
+    return (select(scans)
+          ..where((tbl) => tbl.userId.equals(userId))
+          ..orderBy([(tbl) => OrderingTerm.desc(tbl.scanDate)])
+          ..limit(100))
+        .watch();
+  }
+
+  Future<int> deleteScan(int scanId) {
+    return (delete(scans)..where((tbl) => tbl.id.equals(scanId))).go();
+  }
+
+  Future<int> deleteOldScans(int userId, int keepCount) async {
+    final allScans = await (select(scans)
+          ..where((tbl) => tbl.userId.equals(userId))
+          ..orderBy([(tbl) => OrderingTerm.desc(tbl.scanDate)]))
+        .get();
+    
+    if (allScans.length > keepCount) {
+      final scansToDelete = allScans.skip(keepCount).toList();
+      int deletedCount = 0;
+      for (final scan in scansToDelete) {
+        await (delete(scans)..where((tbl) => tbl.id.equals(scan.id))).go();
+        deletedCount++;
+      }
+      return deletedCount;
+    }
+    return 0;
   }
 }
 
